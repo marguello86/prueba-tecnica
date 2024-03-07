@@ -1,0 +1,102 @@
+CREATE DATABASE BDPRUEBA
+
+GO
+
+USE BDPRUEBA
+
+GO
+
+CREATE TABLE dbo.Producto
+(
+	IdProducto INT IDENTITY(1,1) PRIMARY KEY,
+	NombreProducto NVARCHAR(200) NOT NULL,
+	Existencia INT NOT NULL
+)
+
+GO
+
+CREATE TABLE dbo.Compra
+(
+	IdCompra INT IDENTITY(1,1) PRIMARY KEY,
+	IdProducto INT NOT NULL,
+	Cantidad INT NOT NULL,
+	CostoUnitario DECIMAL(10,2) NOT NULL,
+	FechaCompra SMALLDATETIME NOT NULL
+	CONSTRAINT FK_Compra_Producto FOREIGN KEY(IdProducto) REFERENCES dbo.Producto(IdProducto)
+)
+
+GO
+
+CREATE TABLE dbo.Venta
+(
+	IdVenta INT IDENTITY(1,1) PRIMARY KEY,
+	IdProducto INT NOT NULL,
+	Cantidad INT NOT NULL,
+	PrecioUnitario DECIMAL(10,2) NOT NULL,
+	FechaVenta SMALLDATETIME NOT NULL
+	CONSTRAINT FK_Venta_Producto FOREIGN KEY(IdProducto) REFERENCES dbo.Producto(IdProducto)
+)
+
+GO
+
+CREATE PROCEDURE paInsertarProducto
+@IdProducto INT NULL,
+@NombreProducto NVARCHAR(200),
+@Existencia INT
+AS
+BEGIN
+	INSERT INTO dbo.Producto(NombreProducto,Existencia)
+	VALUES(@NombreProducto,@Existencia)
+END
+
+GO
+
+ALTER PROCEDURE paInsertarCompra
+@IdProducto INT,
+@Cantidad INT,
+@CostoUnitario DECIMAL(10,2),
+@FechaCompra SMALLDATETIME
+AS
+BEGIN
+	INSERT INTO dbo.Compra(IdProducto,Cantidad,CostoUnitario,FechaCompra)
+	VALUES(@IdProducto,@Cantidad,@CostoUnitario,@FechaCompra)
+	
+	IF(@@ROWCOUNT>0)
+	BEGIN
+		UPDATE Producto
+		SET Existencia = Existencia + @Cantidad
+		WHERE IdProducto = @IdProducto
+	END
+END
+
+GO
+
+ALTER PROCEDURE paInsertarVenta
+@IdProducto INT,
+@Cantidad INT,
+@PrecioUnitario DECIMAL(10,2),
+@FechaVenta SMALLDATETIME
+AS
+BEGIN
+	INSERT INTO dbo.Venta(IdProducto,Cantidad,PrecioUnitario,FechaVenta)
+	VALUES(@IdProducto,@Cantidad,@PrecioUnitario,@FechaVenta)
+
+	IF(@@ROWCOUNT>0)
+	BEGIN
+		UPDATE Producto
+		SET Existencia = Existencia - @Cantidad
+		WHERE IdProducto = @IdProducto
+	END
+END
+
+GO
+
+CREATE VIEW vwLeerTransacciones
+AS
+SELECT C.IdProducto, P.NombreProducto, C.Cantidad, C.CostoUnitario, (C.Cantidad*C.CostoUnitario) Total, 'C' Transaccion 
+FROM Compra C INNER JOIN dbo.Producto P
+ON C.IdProducto=P.IdProducto
+UNION ALL
+SELECT V.IdProducto, P.NombreProducto, V.Cantidad, V.PrecioUnitario, (V.Cantidad*V.PrecioUnitario) Total, 'V' Transaccion 
+FROM Venta V INNER JOIN dbo.Producto P
+ON V.IdProducto=P.IdProducto
